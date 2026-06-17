@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EOL Diagnostics Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0a1110;
+    --bg-grid: rgba(52,224,161,0.035);
+    --panel:#121c1a;
+    --panel-2:#0e1715;
+    --border:#1f2e2a;
+    --text:#e8f0ec;
+    --muted:#7c928b;
+    --accent:#34e0a1;
+    --accent-soft: rgba(52,224,161,0.14);
+    --warn:#ff5c5c;
+    --warn-soft: rgba(255,92,92,0.14);
+    --mono:'JetBrains Mono', monospace;
+    --display:'Space Grotesk', sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    min-height:100vh;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(52,224,161,0.06), transparent 40%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--display);
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:32px 16px 64px;
+  }
+
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.12em;
+    color:var(--muted);
+    margin-bottom:28px;
+  }
+  .led{
+    width:8px;
+    height:8px;
+    border-radius:50%;
+    background:var(--muted);
+  }
+  .led.ok{ background:var(--accent); animation:pulse-ok 2s infinite; }
+  .led.bad{ background:var(--warn); animation:pulse-bad 2s infinite; }
+
+  @keyframes pulse-ok{
+    0%{ box-shadow:0 0 0 0 rgba(52,224,161,0.5); }
+    70%{ box-shadow:0 0 0 6px rgba(52,224,161,0); }
+    100%{ box-shadow:0 0 0 0 rgba(52,224,161,0); }
+  }
+  @keyframes pulse-bad{
+    0%{ box-shadow:0 0 0 0 rgba(255,92,92,0.5); }
+    70%{ box-shadow:0 0 0 6px rgba(255,92,92,0); }
+    100%{ box-shadow:0 0 0 0 rgba(255,92,92,0); }
+  }
+
+  .console{
+    width:100%;
+    max-width:760px;
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:36px;
+    box-shadow:0 30px 60px -30px rgba(0,0,0,0.6);
+  }
+
+  .console-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 28px;
+  }
+  .console-head h1{ font-size:28px; font-weight:600; margin:0 0 8px; }
+  .console-head .sub{ font-size:14px; color:var(--muted); margin:0; }
+  
+  .btn-fetch {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--accent);
+    padding: 10px 14px;
+    border-radius: 6px;
+    font-family: var(--font-display);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-fetch:hover { background: var(--accent-soft); border-color: var(--accent); }
+
+  .body-grid{
+    display:grid;
+    grid-template-columns:140px 1fr;
+    gap:32px;
+    align-items:start;
+  }
+
+  .gauge-col{ display:flex; flex-direction:column; align-items:center; text-align:center; }
+  .battery-shell{ position:relative; width:64px; height:140px; border:2px solid var(--border); border-radius:8px; background:var(--panel-2); overflow:hidden; }
+  .battery-nub{ position:absolute; top:-9px; left:50%; transform:translateX(-50%); width:24px; height:7px; background:var(--border); border-radius:3px 3px 0 0; }
+  .battery-fill{ position:absolute; bottom:0; left:0; width:100%; height:0%; background:linear-gradient(180deg, var(--accent), #1f9d6f); transition:height 0.6s ease, background 0.6s ease; }
+  .battery-scan{ position:absolute; top:0; left:0; right:0; height:2px; background:rgba(255,255,255,0.35); animation:scan 3s linear infinite; }
+  
+  @keyframes scan{
+    0%{ transform:translateY(0); opacity:0; }
+    10%{ opacity:0.6; }
+    90%{ opacity:0.6; }
+    100%{ transform:translateY(138px); opacity:0; }
+  }
+
+  .gauge-label{ font-family:var(--mono); font-size:11px; color:var(--muted); margin:14px 0 2px; }
+  .gauge-sub{ font-family:var(--mono); font-size:18px; font-weight:700; margin:0; }
+
+  .form-col{ display:flex; flex-direction:column; gap:14px; }
+  .field-row{ display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .field{ display:flex; flex-direction:column; gap:6px; }
+  .field span{ font-size:12px; color:var(--muted); }
+  
+  .field input, .field select {
+    font-family:var(--mono);
+    font-size:14px;
+    background:var(--panel-2);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:10px 12px;
+    color:var(--text);
+    outline:none;
+  }
+  .field input:focus, .field select:focus{ border-color:var(--accent); }
+
+  .run-btn{
+    margin-top:8px;
+    background:var(--accent);
+    color:#06150f;
+    border:none;
+    border-radius:8px;
+    padding:13px 18px;
+    font-family:var(--display);
+    font-weight:600;
+    font-size:14px;
+    cursor:pointer;
+  }
+  .run-btn:disabled{ opacity:0.6; cursor:wait; }
+
+  .readout{ margin-top:28px; border:1px solid var(--border); border-radius:10px; padding:20px 22px; background:var(--panel-2); }
+  .readout.state-healthy{ background:var(--accent-soft); border-color:rgba(52,224,161,0.4); }
+  .readout.state-eol{ background:var(--warn-soft); border-color:rgba(255,92,92,0.4); }
+  .readout-verdict{ font-size:17px; font-weight:700; margin:0 0 4px; }
+  .readout.state-healthy .readout-verdict{ color:var(--accent); }
+  .readout.state-eol .readout-verdict{ color:var(--warn); }
+  .readout-detail{ font-family:var(--mono); font-size:12.5px; color:var(--muted); margin:2px 0; }
+
+  @media (max-width: 560px){
+    .body-grid{ grid-template-columns:1fr; }
+    .gauge-col{ flex-direction:row; gap:16px; }
+    .field-row{ grid-template-columns:1fr; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="topbar">
+    <span class="led" id="led"></span>
+    <span>SYSTEM <span id="connStatus">CHECKING…</span></span>
+  </div>
+
+  <div class="console">
+    <div class="console-head">
+      <div>
+        <h1>EOL Diagnostics Console</h1>
+        <p class="sub">Live cell telemetry → Random Forest inference</p>
+      </div>
+      <!-- ✅ NEW CONTROL BUTTON -->
+      <button class="btn-fetch" type="button" onclick="loadRandomVehicleData()">🎲 Load Random Fleet Vehicle</button>
+    </div>
+
+    <div class="body-grid">
+      <div class="gauge-col">
+        <div class="battery-shell">
+          <div class="battery-nub"></div>
+          <div class="battery-fill" id="batteryFill"></div>
+          <div class="battery-scan"></div>
+        </div>
+        <p class="gauge-label" id="gaugeLabel">PREVIEW</p>
+        <p class="gauge-sub" id="gaugeSub">—</p>
+      </div>
+
+      <form class="form-col" id="diagForm">
+        <!-- Schema metadata mappings -->
+        <input type="hidden" id="battery_id" value="BAT-0001">
+        <input type="hidden" id="car_model" value="Tesla Model S">
+        <input type="hidden" id="battery_type" value="NMC">
+        <input type="hidden" id="charging_speed" value="Fast (DC)">
+        <input type="hidden" id="climate" value="Temperate">
+        <input type="hidden" id="depth_of_discharge" value="Moderate (10-90%)">
+        <input type="hidden" id="calendar_age_months" value="18.5">
+        <input type="hidden" id="capacity_Ah" value="74.5">
+        <input type="hidden" id="energy_throughput_kwh" value="16500.0">
+
+        <div class="field-row">
+          <label class="field">
+            <span>Mileage (km)</span>
+            <input type="number" id="mileage_km" value="45000" required>
+          </label>
+          <label class="field">
+            <span>Pack voltage (V)</span>
+            <input type="number" id="voltage_V" value="354" step="0.1" required>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>Cell temperature (°C)</span>
+            <input type="number" id="temperature_C" value="25" step="0.1" required>
+          </label>
+          <label class="field">
+            <span>Internal resistance (Ω)</span>
+            <input type="number" id="internal_resistance_ohm" value="0.061" step="0.0001" required>
+          </label>
+        </div>
+        <div class="field-row">
+          <label class="field">
+            <span>State of Health (SoH %)</span>
+            <input type="number" id="soh_percentage" value="91.5" step="0.01" required>
+          </label>
+          <label class="field">
+            <span>Charge cycles completed</span>
+            <input type="number" id="cycle_index" value="850" required>
+          </label>
+        </div>
+        <button type="submit" class="run-btn" id="runBtn">Run Diagnostics</button>
+      </form>
+    </div>
+
+    <div class="readout" id="readout">
+      <p class="readout-detail">// Awaiting telemetry load execution vector.</p>
+    </div>
+  </div>
+
+<script>
+  const API_BASE = "http://127.0.0.1:8000";
+
+  const led = document.getElementById('led');
+  const connStatus = document.getElementById('connStatus');
+  const batteryFill = document.getElementById('batteryFill');
+  const gaugeLabel = document.getElementById('gaugeLabel');
+  const gaugeSub = document.getElementById('gaugeSub');
+  const readout = document.getElementById('readout');
+  const form = document.getElementById('diagForm');
+  const runBtn = document.getElementById('runBtn');
+  const sohInput = document.getElementById('soh_percentage');
+
+  async function checkHealth(){
+    try{
+      const res = await fetch(`${API_BASE}/health`);
+      if(!res.ok) throw new Error();
+      const data = await res.json();
+      if(data.model_loaded){
+        led.className = 'led ok';
+        connStatus.textContent = 'ONLINE';
+      }
+    }catch(e){
+      led.className = 'led bad';
+      connStatus.textContent = 'OFFLINE';
+    }
+  }
+  checkHealth();
+
+  // ✅ DYNAMIC FORM FILLING CALIBRATION
+  async function loadRandomVehicleData() {
+    try {
+      const response = await fetch(`${API_BASE}/random-battery`);
+      if (!response.ok) throw new Error("Dataset read error");
+      const record = await response.json();
+
+      // Map values smoothly into form elements
+      document.getElementById('battery_id').value = record.battery_id || "BAT-UNKNOWN";
+      document.getElementById('car_model').value = record.car_model || "Tesla Model S";
+      document.getElementById('battery_type').value = record.battery_type || "NMC";
+      document.getElementById('charging_speed').value = record.charging_speed || "Fast (DC)";
+      document.getElementById('climate').value = record.climate || "Temperate";
+      document.getElementById('depth_of_discharge').value = record.depth_of_discharge || "Moderate (10-90%)";
+      document.getElementById('calendar_age_months').value = record.calendar_age_months ?? 24;
+      document.getElementById('capacity_Ah').value = record.capacity_Ah ?? 75;
+      document.getElementById('energy_throughput_kwh').value = record.energy_throughput_kwh ?? 15000;
+
+      document.getElementById('mileage_km').value = Math.round(record.mileage_km);
+      document.getElementById('voltage_V').value = parseFloat(record.voltage_V).toFixed(1);
+      document.getElementById('temperature_C').value = Math.round(record.temperature_C);
+      document.getElementById('internal_resistance_ohm').value = parseFloat(record.internal_resistance_ohm).toFixed(4);
+      document.getElementById('soh_percentage').value = parseFloat(record.soh_percentage).toFixed(2);
+      document.getElementById('cycle_index').value = parseInt(record.cycle_index);
+
+      updatePreview();
+      
+      readout.className = "readout";
+      readout.innerHTML = `<p class="readout-detail">// Loaded ${record.battery_id} (${record.car_model}). Ready for diagnostic run.</p>`;
+    } catch (err) {
+      alert("Error reaching API server lookup parameters: " + err.message);
+    }
+  }
+
+  function updatePreview(){
+    const soh = parseFloat(sohInput.value);
+    if(isNaN(soh)){ return; }
+    batteryFill.style.height = `${soh}%`;
+    batteryFill.style.background = 'linear-gradient(180deg, var(--accent), #1f9d6f)';
+    gaugeLabel.textContent = 'LIVE SOH';
+    gaugeSub.textContent = `${Math.round(soh)}%`;
+  }
+  sohInput.addEventListener('input', updatePreview);
+  updatePreview();
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    runBtn.disabled = true;
+    runBtn.textContent = 'Running…';
+
+    const payload = {
+      battery_id: document.getElementById('battery_id').value,
+      car_model: document.getElementById('car_model').value,
+      battery_type: document.getElementById('battery_type').value,
+      charging_speed: document.getElementById('charging_speed').value,
+      climate: document.getElementById('climate').value,
+      depth_of_discharge: document.getElementById('depth_of_discharge').value,
+      calendar_age_months: parseFloat(document.getElementById('calendar_age_months').value),
+      capacity_Ah: parseFloat(document.getElementById('capacity_Ah').value),
+      energy_throughput_kwh: parseFloat(document.getElementById('energy_throughput_kwh').value),
+      
+      mileage_km: parseFloat(document.getElementById('mileage_km').value),
+      voltage_V: parseFloat(document.getElementById('voltage_V').value),
+      temperature_C: parseFloat(document.getElementById('temperature_C').value),
+      internal_resistance_ohm: parseFloat(document.getElementById('internal_resistance_ohm').value),
+      soh_percentage: parseFloat(sohInput.value),
+      cycle_index: parseInt(document.getElementById('cycle_index').value)
+    };
+
+    try{
+      const res = await fetch(`${API_BASE}/predict`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      if(!res.ok) throw new Error();
+
+      const data = await res.json();
+      const isEol = data.eol_reached;
+
+      readout.className = `readout ${isEol ? 'state-eol' : 'state-healthy'}`;
+      readout.innerHTML = `
+        <p class="readout-verdict">${isEol ? '⚠ END OF LIFE' : '✅ HEALTHY'}</p>
+        <p class="readout-detail">Verdict: ${data.status_message}</p>
+        <p class="readout-detail">Model Certainty: ${data.confidence_pct ? data.confidence_pct + '%' : 'n/a'}</p>
+      `;
+
+      gaugeLabel.textContent = 'AI VERDICT';
+      gaugeSub.textContent = isEol ? 'EOL' : 'OK';
+      batteryFill.style.height = isEol ? '15%' : '100%';
+      batteryFill.style.background = isEol ? 'linear-gradient(180deg, var(--warn), #8c2b2b)' : 'linear-gradient(180deg, var(--accent), #1f9d6f)';
+    }catch(err){
+      readout.className = 'readout state-eol';
+      readout.innerHTML = `<p class="readout-verdict">⚠ PROCESSING ERROR</p>`;
+    }finally{
+      runBtn.disabled = false;
+      runBtn.textContent = 'Run Diagnostics';
+    }
+  });
+</script>
+</body>
+</html>

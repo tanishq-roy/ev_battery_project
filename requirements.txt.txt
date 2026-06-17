@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+pandas
+joblib
+
+# Pinned to match the version rf_pipeline.pkl / torch_preprocessor.pkl were
+# trained with. scikit-learn >=1.7 cannot unpickle ColumnTransformer objects
+# saved by 1.6.1 (AttributeError: _RemainderColsList — a known regression,
+# see github.com/scikit-learn/scikit-learn issue #32090). If you retrain the
+# models with a newer scikit-learn instead, you can drop this pin.
+scikit-learn==1.6.1

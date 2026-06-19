@@ -184,4 +184,4 @@ def predict(payload: BatteryTelemetry):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8000)
+    uvicorn.run(app, host='https://eol-diagnostics.vercel.app', port=8000)

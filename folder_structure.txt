@@ -1,0 +1,25 @@
+|   .gitignore
+|   api.py
+|   dataset (USED FOR TRANING).csv
+|   folder_structure.txt
+|   README.md
+|   requirements.txt
+|   vercel.json
+|   
++---data
+|       dataset.csv
+|         
++---models
+|       mlp_weights.pth
+|       rf_pipeline.pkl
+|       torch_preprocessor.pkl
+|       
++---public
+|       index.html
+|       
++---src
+|       data.py
+|       evaluate.py
+|       infer.py
+|       train_pytorch.py
+|       train_sklearn.py

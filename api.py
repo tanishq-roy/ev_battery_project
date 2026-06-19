@@ -171,4 +171,5 @@ def predict(payload: BatteryTelemetry):
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn running on http://0.0.0.0:10000
+    uvicorn.run(app, '0.0.0.0', '8000')
+# Uvicorn running on http://0.0.0.0:10000

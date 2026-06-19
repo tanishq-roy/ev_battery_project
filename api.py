@@ -5,6 +5,7 @@ Exposes standard prediction, health check, and random telemetry data fetching.
 
 import logging
 import os
+import urllib.request
 import random
 from contextlib import asynccontextmanager
 from typing import Literal, Optional
@@ -19,8 +20,18 @@ from pydantic import BaseModel, Field
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("eol_api")
 
-MODEL_PATH = "models/rf_pipeline.pkl"
-DATASET_PATH = "data/dataset.csv"
+# --- PATH & MODEL CONFIGURATION ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATASET_PATH = os.path.join(BASE_DIR, "data", "dataset.csv")
+
+# Your exact direct download link from GitHub Releases
+MODEL_URL = "https://github.com/tanishq-roy/ev_battery_project/releases/download/v1.0/rf_pipeline.pkl"
+
+# Vercel provides a writable /tmp directory for serverless functions
+if os.environ.get("VERCEL"):
+    MODEL_PATH = "/tmp/rf_pipeline.pkl"
+else:
+    MODEL_PATH = os.path.join(BASE_DIR, "models", "rf_pipeline.pkl")
 
 model_store: dict = {"model": None, "load_error": None}
 
@@ -32,23 +43,27 @@ def _diagnose_load_error(exc: Exception) -> str:
             f"Failed to load '{MODEL_PATH}': this pickle was created with an "
             "older scikit-learn (1.6.1) and the ColumnTransformer it contains "
             f"cannot be unpickled by the scikit-learn version installed here "
-            f"({sklearn.__version__}). This is a known scikit-learn regression "
-            "(github.com/scikit-learn/scikit-learn issue #32090). Fix by either: "
-            "(1) installing scikit-learn==1.6.1 in this environment, or "
-            "(2) re-running train_sklearn.py to regenerate the pickle."
+            f"({sklearn.__version__}). This is a known scikit-learn regression. "
+            "Fix by installing scikit-learn==1.6.1 or regenerating the pickle."
         )
-    if isinstance(exc, FileNotFoundError):
-        return f"Could not find {MODEL_PATH}. Run train_sklearn.py first."
     return f"Failed to load '{MODEL_PATH}': {type(exc).__name__}: {msg}"
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: load the model once
+    # Startup: Download the model if it doesn't exist locally, then load it
     try:
+        if not os.path.exists(MODEL_PATH):
+            logger.info("Downloading model from external storage...")
+            os.makedirs(os.path.dirname(MODEL_PATH), exist_ok=True)
+            
+            # Download the file directly from GitHub
+            urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
+            logger.info("Download complete.")
+
         model_store["model"] = joblib.load(MODEL_PATH)
         model_store["load_error"] = None
-        logger.info(f"Loaded model from {MODEL_PATH}")
+        logger.info(f"Loaded model successfully.")
     except Exception as exc:
         diagnosis = _diagnose_load_error(exc)
         logger.error(diagnosis)
@@ -59,9 +74,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="EV Battery EOL Diagnostics API", lifespan=lifespan)
 
+# --- CORS CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://eol-diagnostics.vercel.app"], 
+    allow_origins=["https://eol-diagostics-git-main-cyber-ninja.vercel.app"], # Allows all origins. Update with your frontend URL later for security.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -111,7 +127,6 @@ def health_check():
     }
 
 
-# ✅ NEW ENDPOINT: Fetches a real sample row from your CSV dataset
 @app.get("/random-battery")
 def get_random_battery_row():
     if not os.path.exists(DATASET_PATH):
@@ -121,7 +136,6 @@ def get_random_battery_row():
         )
     try:
         df = pd.read_csv(DATASET_PATH)
-        # Grab a random row and convert to dictionary format
         random_row = df.sample(n=1).to_dict(orient="records")[0]
         return random_row
     except Exception as exc:
@@ -170,6 +184,4 @@ def predict(payload: BatteryTelemetry):
 
 if __name__ == "__main__":
     import uvicorn
-
-    uvicorn.run(app, '0.0.0.0', '8000')
-# Uvicorn running on http://0.0.0.0:10000
+    uvicorn.run(app, host='0.0.0.0', port=8000)

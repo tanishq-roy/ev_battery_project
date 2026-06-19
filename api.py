@@ -77,7 +77,7 @@ app = FastAPI(title="EV Battery EOL Diagnostics API", lifespan=lifespan)
 # --- CORS CONFIGURATION ---
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://eol-diagostics-git-main-cyber-ninja.vercel.app"], # Allows all origins. Update with your frontend URL later for security.
+    allow_origins=["https://eol-diagnostics.vercel.app"], # Allows all origins. Update with your frontend URL later for security.
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

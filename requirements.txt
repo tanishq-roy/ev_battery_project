@@ -2,7 +2,6 @@ fastapi
 uvicorn[standard]
 pandas
 joblib
-xgboost
 
 # Pinned to match the version rf_pipeline.pkl / torch_preprocessor.pkl were
 # trained with. scikit-learn >=1.7 cannot unpickle ColumnTransformer objects
